@@ -1,0 +1,22 @@
+{
+  "manifest_version": 3,
+  "name": "Task Monitor Reload Alert",
+  "version": "1.0.1",
+  "description": "Reloads tasks API, searches text, and plays sound.",
+ "permissions": [
+  "offscreen",
+  "storage",
+  "alarms",
+  "tabs",
+  "scripting"
+],
+  "host_permissions": [
+    "*://www.parimango.com/*"
+  ],
+  "background": {
+    "service_worker": "background.js"
+  },
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
