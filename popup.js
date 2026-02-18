@@ -12,6 +12,7 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const previewText = document.getElementById("previewText");
   const previewInterval = document.getElementById("previewInterval");
+const stopAlarmBtn = document.getElementById("stopAlarmBtn");
 
   // ---- HARD SAFETY CHECK ----
   if (!keywordListEl) {
@@ -100,6 +101,7 @@ document.addEventListener("DOMContentLoaded", () => {
       "keywords",
       "interval",
       "enabled",
+      "alarmPlaying",
     ]);
 
     keywords = data.keywords || [];
@@ -110,6 +112,8 @@ document.addEventListener("DOMContentLoaded", () => {
     renderKeywords();
     updatePreview();
 
+    setStopButtonVisible(!!data.alarmPlaying);
+    
     if (toggleEl && toggleEl.checked) {
       showStatus("Monitoring is ON");
     }
@@ -150,6 +154,7 @@ document.addEventListener("DOMContentLoaded", () => {
       }
 
       await chrome.storage.local.set({ keywords, interval });
+      chrome.runtime.sendMessage({ type: "RESTART_MONITOR" });
 
       updatePreview();
       showStatus("Settings saved");

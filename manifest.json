@@ -8,10 +8,11 @@
   "storage",
   "alarms",
   "tabs",
-  "scripting"
+  "scripting",
+  "notifications"
 ],
   "host_permissions": [
-    "*://www.parimango.com/*"
+    "https://www.w3schools.com/*"
   ],
   "background": {
     "service_worker": "background.js"

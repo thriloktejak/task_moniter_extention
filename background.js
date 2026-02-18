@@ -1,16 +1,74 @@
 // ================= CONFIG =================
-const TARGET_MATCH = "https://www.parimango.com/api/tasks";
+const TARGET_MATCH = "https://www.w3schools.com/python/python_intro.asp";
 const ALARM_NAME = "task-monitor-alarm";
 const SOUND_FILE = "sound.mp3";
 
 console.log("[TaskMonitor] Background loaded");
 
+let isAlarmActive = false;
+let isMonitoringPaused = false;
+// ================= AUTO START ON BROWSER OPEN =================
+chrome.runtime.onStartup.addListener(initMonitoring);
+chrome.runtime.onInstalled.addListener(initMonitoring);
+
+async function initMonitoring() {
+  const { enabled } = await chrome.storage.local.get("enabled");
+
+  if (enabled) {
+    console.log("[TaskMonitor] Auto-starting monitoring on browser start");
+    startMonitoring();
+    isAlarmActive = false;
+  }
+}
+
 // ================= START / STOP =================
+// ================= START / STOP / RESTART =================
 chrome.runtime.onMessage.addListener((msg) => {
   console.log("[TaskMonitor] Message:", msg);
 
-  if (msg.type === "START_MONITOR") startMonitoring();
-  if (msg.type === "STOP_MONITOR") stopMonitoring();
+  if (msg.type === "START_MONITOR") {
+    startMonitoring();
+  }
+
+  if (msg.type === "STOP_MONITOR") {
+    stopMonitoring();
+  }
+
+  if (msg.type === "RESTART_MONITOR") {
+    console.log("[TaskMonitor] Restarting monitor with new interval");
+
+    stopMonitoring().then(() => {
+      startMonitoring();
+    });
+   
+  }
+   if (msg.type === "ALARM_STOPPED") {
+  console.log("[TaskMonitor] Alarm stopped → releasing lock");
+    isAlarmActive = false;
+  isMonitoringPaused = false;
+
+  chrome.storage.local.set({
+    alarmPlaying: false
+  });
+
+  // restart monitoring automatically if enabled
+  chrome.storage.local.get("enabled").then(({ enabled }) => {
+    if (enabled) startMonitoring();
+  });
+}
+  if (msg.type === "ALARM_STARTED") {
+  console.log("[TaskMonitor] Alarm started → pausing monitoring");
+
+  isAlarmActive = true;
+  isMonitoringPaused = true;
+
+  chrome.storage.local.set({
+    alarmPlaying: true
+  });
+
+  // stop further alarm cycles
+  chrome.alarms.clear(ALARM_NAME);
+  }
 });
 
 // ================= START =================
@@ -24,7 +82,7 @@ async function startMonitoring() {
     return;
   }
 
-  await chrome.alarms.clear(ALARM_NAME);
+  await chrome.alarms.clearAll();
 
   chrome.alarms.create(ALARM_NAME, {
     periodInMinutes: interval / 60,
@@ -35,7 +93,7 @@ async function startMonitoring() {
 
 // ================= STOP =================
 async function stopMonitoring() {
-  await chrome.alarms.clear(ALARM_NAME);
+  await chrome.alarms.clearAll();
   console.log("[TaskMonitor] Alarm stopped");
 }
 
@@ -43,13 +101,17 @@ async function stopMonitoring() {
 chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== ALARM_NAME) return;
 
+    if (isMonitoringPaused) {
+    console.log("[TaskMonitor] Monitoring paused → skipping cycle");
+    return;
+  }
   console.log("[TaskMonitor] Alarm triggered → finding tab");
 
+
   const tabs = await chrome.tabs.query({});
-  
-  
+
   const targetTab = tabs.find((t) => t.url && t.url.includes(TARGET_MATCH));
-console.log("[TaskMonitor] Tabs found:", tabs.length);
+  console.log("[TaskMonitor] Tabs found:", tabs.length);
   if (!targetTab) {
     console.warn("[TaskMonitor] Target tab not open");
     return;
@@ -73,6 +135,10 @@ chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
 
 // ================= READ PAGE CONTENT =================
 async function checkTabContent(tabId) {
+  if (isMonitoringPaused) {
+  console.log("[TaskMonitor] Skipping content check (paused)");
+  return;
+}
   try {
     const { keywords, enabled } = await chrome.storage.local.get([
       "keywords",
@@ -96,12 +162,19 @@ async function checkTabContent(tabId) {
     console.log("[TaskMonitor] Page length:", pageText.length);
 
     const found = keywords.find((k) =>
-      pageText.toLowerCase().includes(k.toLowerCase())
+      pageText.toLowerCase().includes(k.toLowerCase()),
     );
 
     if (found) {
       console.log("[TaskMonitor] MATCH FOUND →", found);
+      if (isAlarmActive) {
+        console.log("[TaskMonitor] Alarm already active → skip");
+        return;
+      }
+
+      isAlarmActive = true;
       playSound();
+      showNotification();
     } else {
       console.log("[TaskMonitor] No match");
     }
@@ -127,7 +200,7 @@ async function playSound() {
     });
 
     // IMPORTANT: small delay to allow listener to register
-    await new Promise(resolve => setTimeout(resolve, 200));
+    await new Promise((resolve) => setTimeout(resolve, 200));
   }
 
   console.log("[TaskMonitor] Sending PLAY_SOUND message");
@@ -139,3 +212,30 @@ async function playSound() {
   }
 }
 
+// ================= SHOW DESKTOP NOTIFICATION =================
+function showNotification() {
+  chrome.notifications.create("task-monitor-alert", {
+    type: "basic",
+    iconUrl: "icon.png", // make sure icon.png exists
+    title: "Task Monitor",
+    message: "New tasks are posted on the site",
+    buttons: [
+      { title: "Stop Alarm" }
+    ],
+    priority: 2
+  });
+}
+
+
+// ================= NOTIFICATION BUTTON CLICK =================
+if (chrome.notifications && chrome.notifications.onButtonClicked) {
+  chrome.notifications.onButtonClicked.addListener(async (notifId, btnIndex) => {
+    if (notifId !== "task-monitor-alert") return;
+
+    console.log("[TaskMonitor] Notification Stop button clicked");
+
+    await chrome.runtime.sendMessage({ type: "STOP_SOUND" });
+    chrome.notifications.clear("task-monitor-alert");
+    isAlarmActive = false;
+  });
+}
