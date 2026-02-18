@@ -1,5 +1,5 @@
 // ================= CONFIG =================
-const TARGET_MATCH = "https://www.w3schools.com/python/python_intro.asp";
+const TARGET_MATCH = "https://www.parimango.com/api/tasks";
 const ALARM_NAME = "task-monitor-alarm";
 const SOUND_FILE = "sound.mp3";
 
@@ -161,12 +161,20 @@ async function checkTabContent(tabId) {
 
     console.log("[TaskMonitor] Page length:", pageText.length);
 
-    const found = keywords.find((k) =>
-      pageText.toLowerCase().includes(k.toLowerCase()),
-    );
+   const { minCount = 0 } = await chrome.storage.local.get("minCount");
 
-    if (found) {
-      console.log("[TaskMonitor] MATCH FOUND →", found);
+let totalMatches = 0;
+
+for (const k of keywords) {
+  const regex = new RegExp(k, "gi");
+  const matches = pageText.match(regex);
+  if (matches) totalMatches += matches.length;
+}
+
+console.log("[TaskMonitor] Total keyword matches:", totalMatches, "Min required:", minCount);
+
+if (totalMatches > minCount) {
+      console.log("[TaskMonitor] MATCH FOUND →", totalMatches, "matches");
       if (isAlarmActive) {
         console.log("[TaskMonitor] Alarm already active → skip");
         return;

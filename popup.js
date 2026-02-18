@@ -13,6 +13,8 @@ document.addEventListener("DOMContentLoaded", () => {
   const previewText = document.getElementById("previewText");
   const previewInterval = document.getElementById("previewInterval");
 const stopAlarmBtn = document.getElementById("stopAlarmBtn");
+const minCountInput = document.getElementById("minCount");
+
 
   // ---- HARD SAFETY CHECK ----
   if (!keywordListEl) {
@@ -102,10 +104,12 @@ const stopAlarmBtn = document.getElementById("stopAlarmBtn");
       "interval",
       "enabled",
       "alarmPlaying",
+      "minCount",
     ]);
 
     keywords = data.keywords || [];
 
+    if (minCountInput) minCountInput.value = data.minCount || 0;
     if (intervalInput) intervalInput.value = data.interval || "";
     if (toggleEl) toggleEl.checked = data.enabled || false;
 
@@ -113,7 +117,7 @@ const stopAlarmBtn = document.getElementById("stopAlarmBtn");
     updatePreview();
 
     setStopButtonVisible(!!data.alarmPlaying);
-    
+
     if (toggleEl && toggleEl.checked) {
       showStatus("Monitoring is ON");
     }
@@ -153,8 +157,10 @@ const stopAlarmBtn = document.getElementById("stopAlarmBtn");
         return;
       }
 
-      await chrome.storage.local.set({ keywords, interval });
-      chrome.runtime.sendMessage({ type: "RESTART_MONITOR" });
+const minCount = parseInt(minCountInput.value || "0", 10);
+
+await chrome.storage.local.set({ keywords, interval, minCount });
+chrome.runtime.sendMessage({ type: "RESTART_MONITOR" });
 
       updatePreview();
       showStatus("Settings saved");

@@ -12,7 +12,7 @@
   "notifications"
 ],
   "host_permissions": [
-    "https://www.w3schools.com/*"
+    "https://www.parimango.com/*"
   ],
   "background": {
     "service_worker": "background.js"
