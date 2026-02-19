@@ -1,5 +1,4 @@
 // ================= CONFIG =================
-const TARGET_MATCH = "https://www.parimango.com/api/tasks";
 const ALARM_NAME = "task-monitor-alarm";
 const SOUND_FILE = "sound.mp3";
 
@@ -110,7 +109,15 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
   const tabs = await chrome.tabs.query({});
 
-  const targetTab = tabs.find((t) => t.url && t.url.includes(TARGET_MATCH));
+  const { targetUrl } = await chrome.storage.local.get("targetUrl");
+
+if (!targetUrl) {
+  console.warn("[TaskMonitor] No target URL configured");
+  return;
+}
+
+const targetTab = tabs.find((t) => t.url && t.url.includes(targetUrl));
+
   console.log("[TaskMonitor] Tabs found:", tabs.length);
   if (!targetTab) {
     console.warn("[TaskMonitor] Target tab not open");
@@ -126,7 +133,10 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 // ================= AFTER TAB LOAD =================
 chrome.tabs.onUpdated.addListener(async (tabId, info, tab) => {
   if (info.status !== "complete") return;
-  if (!tab.url || !tab.url.includes(TARGET_MATCH)) return;
+  const { targetUrl } = await chrome.storage.local.get("targetUrl");
+
+if (!targetUrl || !tab.url || !tab.url.includes(targetUrl)) return;
+
 
   console.log("[TaskMonitor] Target tab reloaded → checking content");
 
@@ -161,7 +171,7 @@ async function checkTabContent(tabId) {
 
     console.log("[TaskMonitor] Page length:", pageText.length);
 
-   const { minCount = 0 } = await chrome.storage.local.get("minCount");
+   const { minCount = 1 } = await chrome.storage.local.get("minCount");
 
 let totalMatches = 0;
 
@@ -173,7 +183,7 @@ for (const k of keywords) {
 
 console.log("[TaskMonitor] Total keyword matches:", totalMatches, "Min required:", minCount);
 
-if (totalMatches > minCount) {
+if (totalMatches >= minCount) {
       console.log("[TaskMonitor] MATCH FOUND →", totalMatches, "matches");
       if (isAlarmActive) {
         console.log("[TaskMonitor] Alarm already active → skip");

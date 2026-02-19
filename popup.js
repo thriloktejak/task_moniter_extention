@@ -12,9 +12,9 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const previewText = document.getElementById("previewText");
   const previewInterval = document.getElementById("previewInterval");
-const stopAlarmBtn = document.getElementById("stopAlarmBtn");
-const minCountInput = document.getElementById("minCount");
-
+  const stopAlarmBtn = document.getElementById("stopAlarmBtn");
+  const minCountInput = document.getElementById("minCount");
+  const targetUrlInput = document.getElementById("targetUrl");
 
   // ---- HARD SAFETY CHECK ----
   if (!keywordListEl) {
@@ -77,7 +77,8 @@ const minCountInput = document.getElementById("minCount");
   }
 
   function updatePreview() {
-    if (previewText) previewText.textContent = keywords.length ? keywords.join(", ") : "—";
+    if (previewText)
+      previewText.textContent = keywords.length ? keywords.join(", ") : "—";
     if (previewInterval)
       previewInterval.textContent = intervalInput.value
         ? `${intervalInput.value}s`
@@ -92,7 +93,7 @@ const minCountInput = document.getElementById("minCount");
     statusEl.style.color = isActive ? "#22c55e" : "#ef4444";
   }
 
-    function setStopButtonVisible(visible) {
+  function setStopButtonVisible(visible) {
     if (!stopAlarmBtn) return;
     stopAlarmBtn.style.display = visible ? "block" : "none";
   }
@@ -105,12 +106,14 @@ const minCountInput = document.getElementById("minCount");
       "enabled",
       "alarmPlaying",
       "minCount",
+      "targetUrl",
     ]);
 
     keywords = data.keywords || [];
 
-    if (minCountInput) minCountInput.value = data.minCount || 0;
+    if (minCountInput) minCountInput.value = data.minCount || 1;
     if (intervalInput) intervalInput.value = data.interval || "";
+    if (targetUrlInput) targetUrlInput.value = data.targetUrl || "";
     if (toggleEl) toggleEl.checked = data.enabled || false;
 
     renderKeywords();
@@ -136,7 +139,7 @@ const minCountInput = document.getElementById("minCount");
 
       keywords.push(value);
       searchInput.value = "";
-
+      chrome.runtime.sendMessage({ type: "RESTART_MONITOR" });
       renderKeywords();
       updatePreview();
     };
@@ -152,17 +155,28 @@ const minCountInput = document.getElementById("minCount");
         return;
       }
 
+
       if (!interval || interval < 5) {
         showStatus("Interval must be ≥ 5 seconds", false);
         return;
       }
 
-const minCount = parseInt(minCountInput.value || "0", 10);
+      const minCount = parseInt(minCountInput.value || "1", 10);
+      
+      const targetUrl = targetUrlInput.value.trim();
 
-await chrome.storage.local.set({ keywords, interval, minCount });
-chrome.runtime.sendMessage({ type: "RESTART_MONITOR" });
+      if (!targetUrl.startsWith("http")) {
+        showStatus("Enter valid URL", false);
+        return;
+      }
+
+      
+
+      await chrome.storage.local.set({ keywords, interval, minCount, targetUrl });
+      chrome.runtime.sendMessage({ type: "RESTART_MONITOR" });
 
       updatePreview();
+
       showStatus("Settings saved");
     };
   }
@@ -184,7 +198,7 @@ chrome.runtime.sendMessage({ type: "RESTART_MONITOR" });
     };
   }
 
-    // ---------- Stop alarm button ----------
+  // ---------- Stop alarm button ----------
   if (stopAlarmBtn) {
     stopAlarmBtn.onclick = async () => {
       try {
